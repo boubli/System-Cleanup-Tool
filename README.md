@@ -34,9 +34,9 @@ python main.py
 
 ## Download the Executable
 
-You can download the **System Cleanup Tool** executable directly from the GitHub releases page:
+You can download the **System Cleanup Tool V1.0** executable directly from the GitHub releases page:
 
-[Download System Cleanup Tool .exe](https://github.com/boubli/System-Cleanup-Tool/releases/latest/download/System%20Cleanup%20Tool.exe)
+[Download System Cleanup Tool V1.0 .exe](https://github.com/boubli/System-Cleanup-Tool/releases/download/v1.0/System.Cleanup.Tool.exe)
 
 ---
 
