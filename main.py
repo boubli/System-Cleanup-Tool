@@ -21,38 +21,35 @@ class CleanupThread(QThread):
         self.defrag_hdd = defrag_hdd
         self.combined_cleanup = combined_cleanup
         self.removed_items = []
+        self.recycled_bin_size_gb = 0
+        self.total_deleted_count = 0
 
     def run(self):
         try:
             # Clean Temp folders, Prefetch, and %TEMP% if selected
-            total_deleted_count = 0
             if self.combined_cleanup:
-                total_deleted_count += self.clean_combined_temp_folders()
+                self.total_deleted_count += self.clean_combined_temp_folders()
             self.progress.emit(10)
 
             # Clean Browser Cache if selected
-            browser_cache_count = 0
             if self.browser_cache:
-                browser_cache_count = self.clean_browser_cache()
+                self.clean_browser_cache()
                 self.progress.emit(20)
 
             # Remove Duplicate Files if selected
-            duplicate_files_count = 0
             if self.duplicate_files:
-                duplicate_files_count = self.remove_duplicate_files()
+                self.remove_duplicate_files()
                 self.progress.emit(30)
 
-            # Clean Recycle Bin if Temp Cleanup is selected
-            recycle_bin_size_gb = 0
-            if self.combined_cleanup:
-                recycle_bin_size_gb = self.get_recycle_bin_size()
+            # Clean Recycle Bin only if "Clean System Cache and Temporary Folders" is selected
+            if self.combined_cleanup:  # Only clean the Recycle Bin if this option is checked
+                self.recycled_bin_size_gb = self.get_recycle_bin_size()
                 self.clean_recycle_bin()
             self.progress.emit(40)
 
             # Check and remove old System Restore Points if selected
-            restore_points_count = 0
             if self.restore_points:
-                restore_points_count = self.check_and_remove_restore_points()
+                self.check_and_remove_restore_points()
                 self.progress.emit(50)
 
             # Defragment HDD if selected
@@ -61,11 +58,14 @@ class CleanupThread(QThread):
                 self.progress.emit(60)
 
             # Summarize cleanup
-            total_count = total_deleted_count + browser_cache_count + duplicate_files_count + restore_points_count
             self.progress.emit(100)  # Emit 100% when everything is done
 
             # Prepare the summary of removed items
-            summary = f"Cleanup completed:\n- {total_count} files deleted\n- {recycle_bin_size_gb:.2f} GB in Recycle Bin before cleaning"
+            summary = "Cleanup completed:\n"
+            if self.total_deleted_count > 0:
+                summary += f"- {self.total_deleted_count} files deleted\n"
+            if self.recycled_bin_size_gb > 0:
+                summary += f"- {self.recycled_bin_size_gb:.2f} GB in Recycle Bin before cleaning"
             if self.removed_items:
                 summary += "\n\nRemoved items:\n" + "\n".join(self.removed_items)
 
@@ -110,14 +110,12 @@ class CleanupThread(QThread):
         # Placeholder: Implement specific browser cache cleaning here
         print("Cleaning browser cache...")
         self.removed_items.append("Browser Cache: Chrome, Firefox, etc.")  # Placeholder
-        return 5  # Placeholder count
 
     def remove_duplicate_files(self):
         """Remove duplicate files."""
         # Placeholder: Implement logic to find and remove duplicate files
         print("Removing duplicate files...")
         self.removed_items.append("Duplicate Files: Example.txt, Example2.txt")  # Placeholder
-        return 3  # Placeholder count
 
     def get_recycle_bin_size(self):
         """Get the total size of the Recycle Bin."""
@@ -146,14 +144,12 @@ class CleanupThread(QThread):
         # Placeholder: Implement logic to check and remove old restore points
         print("Checking and removing old system restore points...")
         self.removed_items.append("Old System Restore Points: Removed")
-        return 2  # Placeholder count
 
     def defragment_hdd(self):
         """Defragment HDD if it's an HDD."""
         # Placeholder: Implement logic for defragmenting HDD
         print("Defragmenting HDD...")
         self.removed_items.append("Defragmentation: HDD Defragmented")
-        return
 
 
 class CleanupApp(QWidget):
@@ -246,10 +242,8 @@ class CleanupApp(QWidget):
     def show_about_info(self):
         about_info = (
             "Version: 1.0\n"
-            "Developer: Youssef Boubli\n"
-            "GitHub: https://github.com/boubli\n"
-            "Email: bbb.vloger@gmail.com\n"
-            "Phone: +48 514 450 053\n"
+            "This tool helps clean up temporary files, browser cache, duplicate files, and more.\n"
+            "Created by Youssef Boubli."
         )
         QMessageBox.information(self, "About", about_info)
 
