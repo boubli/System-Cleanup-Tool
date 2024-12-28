@@ -1,5 +1,17 @@
 # System Cleanup Tool
 
+## Overview
+
+The **System Cleanup Tool** is a lightweight and user-friendly application designed to help users clean up unnecessary files from their Windows systems. By removing temporary files, prefetch files, and emptying the Recycle Bin, the tool helps improve system performance and free up valuable disk space. With a simple and intuitive interface, it is perfect for both beginners and experienced users who want to optimize their systems with minimal effort.
+
+## Features
+
+- **Temporary File Cleanup**: Automatically removes temporary files from system folders, freeing up disk space.
+- **Prefetch File Cleanup**: Cleans the prefetch folder, which stores information to speed up application launches.
+- **Recycle Bin Cleanup**: Empties the Recycle Bin to permanently remove deleted files and reclaim storage.
+- **Progress Monitoring**: Real-time progress bar to show the status of the cleanup process.
+- **User-Friendly Interface**: Clean and simple graphical user interface (GUI) that requires no technical knowledge.
+
 ## Navigate to the Project Directory
 
 ```bash
