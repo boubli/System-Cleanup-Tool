@@ -267,9 +267,8 @@ class CleanupApp(QWidget):
 
     def show_about_info(self):
         about_message = """
-        System Cleanup Tool v1.0
-        Developed by Youssef Boubli
-        This tool helps you clean temporary files, browser cache, remove duplicate files, defragment your hard drive, and more.
+        System Cleanup Tool v2.0
+        Developed by | Youssef Boubli
         """
         QMessageBox.about(self, "About", about_message)
 

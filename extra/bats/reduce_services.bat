@@ -52,5 +52,5 @@ echo .
 echo .
 echo .
 echo .
-echo Subscribe to Khorvie Tech
+echo TRADMSS
 timeout /t 15
