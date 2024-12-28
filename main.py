@@ -226,7 +226,7 @@ class CleanupApp(QWidget):
             release_page_url = latest_release['html_url']  # GitHub release page URL
             download_url = latest_release['assets'][0]['browser_download_url']  # URL for the first asset (assumed to be the installer)
 
-            current_version = "1.5"  # Set your current app version here
+            current_version = "1.0"  # Set your current app version here
 
             if latest_version != current_version:
                 reply = QMessageBox.question(self, "Update Available", 
