@@ -71,7 +71,7 @@ class CleanupThread(QThread):
             if self.total_deleted_count > 0:
                 summary += f"- {self.total_deleted_count} files deleted\n"
             if self.recycled_bin_size_gb > 0:
-                summary += f"- {self.recycled_bin_size_gb:.2f} GB in Recycle Bin before cleaning"
+                summary += f"- {self.recycled_bin_size_gb:.2f} GB in Recycle Bin"
             if self.removed_items:
                 summary += "\n\nRemoved items:\n" + "\n".join(self.removed_items)
             if self.added_items:
