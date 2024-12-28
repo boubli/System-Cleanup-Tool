@@ -1,4 +1,4 @@
-# ![App Icon](https://github.com/boubli/System-Cleanup-Tool/blob/main/build/main/icon/icon.ico) System Cleanup Tool
+#  System Cleanup Tool
 
 ## Overview
 
