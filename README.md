@@ -36,7 +36,7 @@ python main.py
 
 You can download the **System Cleanup Tool V1.0** executable directly from the GitHub releases page:
 
-[Download System Cleanup Tool V2.0 .exe](https://github.com/boubli/System-Cleanup-Tool/releases/download/v1.0/System.Cleanup.Tool.v2.0.exe)
+[Download System Cleanup Tool V2.0 .exe](https://github.com/boubli/System-Cleanup-Tool/releases/download/v2.0/System.Cleanup.Tool.v2.0.exe)
 
 ---
 
