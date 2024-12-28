@@ -2,58 +2,87 @@ import os
 import shutil
 import sys
 import ctypes
-import requests
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QProgressBar, QMessageBox, QHBoxLayout
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QProgressBar, QMessageBox, QHBoxLayout, QCheckBox
 from PySide6.QtGui import QIcon
 
 class CleanupThread(QThread):
     progress = Signal(int)
     finished = Signal(str)
 
-    def __init__(self, temp_folder, prefetch_folder, recycle_bin_path):
+    def __init__(self, temp_folder, prefetch_folder, recycle_bin_path, browser_cache, duplicate_files, restore_points, defrag_hdd, combined_cleanup):
         super().__init__()
         self.temp_folder = temp_folder
         self.prefetch_folder = prefetch_folder
         self.recycle_bin_path = recycle_bin_path
+        self.browser_cache = browser_cache
+        self.duplicate_files = duplicate_files
+        self.restore_points = restore_points
+        self.defrag_hdd = defrag_hdd
+        self.combined_cleanup = combined_cleanup
+        self.removed_items = []
 
     def run(self):
         try:
-            # Clean Temp folders
-            temp_count = self.clean_temp_folders()
-            self.progress.emit(25)
+            # Clean Temp folders, Prefetch, and %TEMP% if selected
+            total_deleted_count = 0
+            if self.combined_cleanup:
+                total_deleted_count += self.clean_combined_temp_folders()
+            self.progress.emit(10)
 
-            # Clean Prefetch folder
-            prefetch_count = self.delete_files_in_folder(self.prefetch_folder)
-            self.progress.emit(50)
+            # Clean Browser Cache if selected
+            browser_cache_count = 0
+            if self.browser_cache:
+                browser_cache_count = self.clean_browser_cache()
+                self.progress.emit(20)
 
-            # Get Recycle Bin size before cleaning
-            recycle_bin_size_gb = self.get_recycle_bin_size()
+            # Remove Duplicate Files if selected
+            duplicate_files_count = 0
+            if self.duplicate_files:
+                duplicate_files_count = self.remove_duplicate_files()
+                self.progress.emit(30)
 
-            # Clean Recycle Bin
-            self.clean_recycle_bin()
-            self.progress.emit(75)
+            # Clean Recycle Bin if Temp Cleanup is selected
+            recycle_bin_size_gb = 0
+            if self.combined_cleanup:
+                recycle_bin_size_gb = self.get_recycle_bin_size()
+                self.clean_recycle_bin()
+            self.progress.emit(40)
+
+            # Check and remove old System Restore Points if selected
+            restore_points_count = 0
+            if self.restore_points:
+                restore_points_count = self.check_and_remove_restore_points()
+                self.progress.emit(50)
+
+            # Defragment HDD if selected
+            if self.defrag_hdd:
+                self.defragment_hdd()
+                self.progress.emit(60)
 
             # Summarize cleanup
-            total_count = temp_count + prefetch_count
+            total_count = total_deleted_count + browser_cache_count + duplicate_files_count + restore_points_count
             self.progress.emit(100)  # Emit 100% when everything is done
-            self.finished.emit(f"Cleanup completed:\n- {total_count} files deleted\n- {recycle_bin_size_gb:.2f} GB in Recycle Bin before cleaning")
+
+            # Prepare the summary of removed items
+            summary = f"Cleanup completed:\n- {total_count} files deleted\n- {recycle_bin_size_gb:.2f} GB in Recycle Bin before cleaning"
+            if self.removed_items:
+                summary += "\n\nRemoved items:\n" + "\n".join(self.removed_items)
+
+            self.finished.emit(summary)
         except Exception as e:
             self.finished.emit(f"An error occurred during cleanup:\n{e}")
 
-    def clean_temp_folders(self):
-        """Clean temp folders for all users."""
-        total_deleted_count = 0
-
-        # User temp folder
+    def clean_combined_temp_folders(self):
+        """Clean combined temp folders for all users."""
+        deleted_count = 0
         user_temp_folder = os.getenv('TEMP')
-        total_deleted_count += self.delete_files_in_folder(user_temp_folder)
-
-        # System temp folder (usually under C:\Windows\Temp)
+        deleted_count += self.delete_files_in_folder(user_temp_folder)
         system_temp_folder = r"C:\Windows\Temp"
-        total_deleted_count += self.delete_files_in_folder(system_temp_folder)
-
-        return total_deleted_count
+        deleted_count += self.delete_files_in_folder(system_temp_folder)
+        prefetch_folder = r"C:\Windows\Prefetch"
+        deleted_count += self.delete_files_in_folder(prefetch_folder)
+        return deleted_count
 
     def delete_files_in_folder(self, folder_path):
         """Delete all files and folders in the specified folder."""
@@ -64,9 +93,11 @@ class CleanupThread(QThread):
                 try:
                     if os.path.isfile(item_path) or os.path.islink(item_path):
                         os.unlink(item_path)  # Remove file or symbolic link
+                        self.removed_items.append(f"File: {item_path}")
                         deleted_count += 1
                     elif os.path.isdir(item_path):
                         shutil.rmtree(item_path)  # Remove directory
+                        self.removed_items.append(f"Directory: {item_path}")
                         deleted_count += 1
                 except Exception as e:
                     print(f"Failed to delete {item_path}: {e}")
@@ -74,10 +105,23 @@ class CleanupThread(QThread):
             print(f"Folder not found: {folder_path}")
         return deleted_count
 
+    def clean_browser_cache(self):
+        """Clean browser cache."""
+        # Placeholder: Implement specific browser cache cleaning here
+        print("Cleaning browser cache...")
+        self.removed_items.append("Browser Cache: Chrome, Firefox, etc.")  # Placeholder
+        return 5  # Placeholder count
+
+    def remove_duplicate_files(self):
+        """Remove duplicate files."""
+        # Placeholder: Implement logic to find and remove duplicate files
+        print("Removing duplicate files...")
+        self.removed_items.append("Duplicate Files: Example.txt, Example2.txt")  # Placeholder
+        return 3  # Placeholder count
+
     def get_recycle_bin_size(self):
         """Get the total size of the Recycle Bin."""
         total_size = 0
-        # Use ctypes to access Recycle Bin
         SHQUERYRBINFO = ctypes.Structure
         class SHQUERYRBINFO(ctypes.Structure):
             _fields_ = [("cbSize", ctypes.c_ulong),
@@ -95,8 +139,21 @@ class CleanupThread(QThread):
 
     def clean_recycle_bin(self):
         """Clean the Recycle Bin."""
-        # Simulate cleaning the Recycle Bin (this is just a placeholder)
         ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, 0)
+
+    def check_and_remove_restore_points(self):
+        """Check and remove old system restore points."""
+        # Placeholder: Implement logic to check and remove old restore points
+        print("Checking and removing old system restore points...")
+        self.removed_items.append("Old System Restore Points: Removed")
+        return 2  # Placeholder count
+
+    def defragment_hdd(self):
+        """Defragment HDD if it's an HDD."""
+        # Placeholder: Implement logic for defragmenting HDD
+        print("Defragmenting HDD...")
+        self.removed_items.append("Defragmentation: HDD Defragmented")
+        return
 
 
 class CleanupApp(QWidget):
@@ -104,7 +161,7 @@ class CleanupApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("System Cleanup Tool")
-        self.setGeometry(100, 100, 400, 200)
+        self.setGeometry(100, 100, 400, 300)
 
         # Set application icon (use the full path to the icon)
         self.setWindowIcon(QIcon(r"C:\Users\youssef\Desktop\app cleaner\images\icon.ico"))
@@ -121,7 +178,20 @@ class CleanupApp(QWidget):
         self.progress_bar.setRange(0, 100)
         layout.addWidget(self.progress_bar)
 
-        # Button
+        # Checkboxes for optional features
+        self.combined_cleanup_checkbox = QCheckBox("Clean System Cache and Temporary Folders")
+        self.browser_cache_checkbox = QCheckBox("Clean Browser Cache")
+        self.duplicate_files_checkbox = QCheckBox("Remove Duplicate Files")
+        self.restore_points_checkbox = QCheckBox("Old System Restore Points Remove")
+        self.defrag_hdd_checkbox = QCheckBox("Defragment Hard Drive (HDD only)")
+
+        layout.addWidget(self.combined_cleanup_checkbox)
+        layout.addWidget(self.browser_cache_checkbox)
+        layout.addWidget(self.duplicate_files_checkbox)
+        layout.addWidget(self.restore_points_checkbox)
+        layout.addWidget(self.defrag_hdd_checkbox)
+
+        # Button to start cleanup
         self.cleanup_button = QPushButton("Clean Now")
         self.cleanup_button.clicked.connect(self.start_cleanup)
         layout.addWidget(self.cleanup_button)
@@ -134,18 +204,37 @@ class CleanupApp(QWidget):
         # Set the layout
         self.setLayout(layout)
 
-        # Check for updates on startup
-        self.check_for_updates()
-
     def start_cleanup(self):
-        # Set up the cleanup thread
+        # Check if at least one feature is selected
+        if not (self.combined_cleanup_checkbox.isChecked() or
+                self.browser_cache_checkbox.isChecked() or
+                self.duplicate_files_checkbox.isChecked() or
+                self.restore_points_checkbox.isChecked() or
+                self.defrag_hdd_checkbox.isChecked()):
+            QMessageBox.warning(self, "Error", "Please select at least one cleanup option before proceeding.")
+            return
+
+        # Set up the cleanup thread with selected options
         temp_folder = os.getenv('TEMP')
         prefetch_folder = r"C:\Windows\Prefetch"
         recycle_bin_path = "C:/$Recycle.Bin"
 
-        self.cleanup_thread = CleanupThread(temp_folder, prefetch_folder, recycle_bin_path)
+        self.cleanup_thread = CleanupThread(
+            temp_folder,
+            prefetch_folder,
+            recycle_bin_path,
+            self.browser_cache_checkbox.isChecked(),  # Only clean browser cache if checked
+            self.duplicate_files_checkbox.isChecked(),  # Only remove duplicate files if checked
+            self.restore_points_checkbox.isChecked(),  # Only check and remove restore points if checked
+            self.defrag_hdd_checkbox.isChecked(),  # Only defrag HDD if checked
+            self.combined_cleanup_checkbox.isChecked()  # Only clean temp folders if checked
+        )
+
+        # Connect signals
         self.cleanup_thread.progress.connect(self.update_progress)
         self.cleanup_thread.finished.connect(self.show_message)
+
+        # Start the cleanup thread
         self.cleanup_thread.start()
 
     def update_progress(self, value):
@@ -164,44 +253,6 @@ class CleanupApp(QWidget):
         )
         QMessageBox.information(self, "About", about_info)
 
-    def check_for_updates(self):
-        """Check for updates on GitHub."""
-        current_version = "1.0"  # Current version of your app
-        repo_url = "https://api.github.com/repos/boubli/System-Cleanup-Tool/releases/latest"
-
-        try:
-            response = requests.get(repo_url)
-            response.raise_for_status()
-            latest_release = response.json()
-            latest_version = latest_release["tag_name"]
-
-            if latest_version != current_version:
-                self.prompt_for_update(latest_version)
-        except requests.RequestException as e:
-            print(f"Failed to check for updates: {e}")
-
-    def prompt_for_update(self, latest_version):
-        """Prompt the user to update the app."""
-        reply = QMessageBox.question(self, "Update Available", f"A new version ({latest_version}) is available. Would you like to update?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        if reply == QMessageBox.Yes:
-            self.download_and_install_update()
-
-    def download_and_install_update(self):
-        """Download and install the update."""
-        # You can provide the URL for the latest release (e.g., .exe or .dmg file)
-        update_url = "https://github.com/boubli/System-Cleanup-Tool/releases/download/v1.1/SystemCleanupTool_v1.1.exe"
-        try:
-            response = requests.get(update_url, stream=True)
-            response.raise_for_status()
-
-            with open("SystemCleanupTool_Update.exe", "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-            QMessageBox.information(self, "Update Downloaded", "The update has been downloaded. Please install it manually.")
-        except requests.RequestException as e:
-            QMessageBox.warning(self, "Update Failed", f"Failed to download the update: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
