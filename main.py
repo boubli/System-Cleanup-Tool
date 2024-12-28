@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import ctypes
+import requests
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QProgressBar, QMessageBox, QHBoxLayout
 from PySide6.QtGui import QIcon
@@ -133,6 +134,9 @@ class CleanupApp(QWidget):
         # Set the layout
         self.setLayout(layout)
 
+        # Check for updates on startup
+        self.check_for_updates()
+
     def start_cleanup(self):
         # Set up the cleanup thread
         temp_folder = os.getenv('TEMP')
@@ -160,6 +164,44 @@ class CleanupApp(QWidget):
         )
         QMessageBox.information(self, "About", about_info)
 
+    def check_for_updates(self):
+        """Check for updates on GitHub."""
+        current_version = "1.0"  # Current version of your app
+        repo_url = "https://api.github.com/repos/boubli/System-Cleanup-Tool/releases/latest"
+
+        try:
+            response = requests.get(repo_url)
+            response.raise_for_status()
+            latest_release = response.json()
+            latest_version = latest_release["tag_name"]
+
+            if latest_version != current_version:
+                self.prompt_for_update(latest_version)
+        except requests.RequestException as e:
+            print(f"Failed to check for updates: {e}")
+
+    def prompt_for_update(self, latest_version):
+        """Prompt the user to update the app."""
+        reply = QMessageBox.question(self, "Update Available", f"A new version ({latest_version}) is available. Would you like to update?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if reply == QMessageBox.Yes:
+            self.download_and_install_update()
+
+    def download_and_install_update(self):
+        """Download and install the update."""
+        # You can provide the URL for the latest release (e.g., .exe or .dmg file)
+        update_url = "https://github.com/boubli/System-Cleanup-Tool/releases/download/v1.1/SystemCleanupTool_v1.1.exe"
+        try:
+            response = requests.get(update_url, stream=True)
+            response.raise_for_status()
+
+            with open("SystemCleanupTool_Update.exe", "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            QMessageBox.information(self, "Update Downloaded", "The update has been downloaded. Please install it manually.")
+        except requests.RequestException as e:
+            QMessageBox.warning(self, "Update Failed", f"Failed to download the update: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
