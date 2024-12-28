@@ -26,6 +26,7 @@ class CleanupThread(QThread):
         self.import_power_plan = import_power_plan
         self.reduce_services = reduce_services
         self.removed_items = []
+        self.added_items = []
         self.recycled_bin_size_gb = 0
         self.total_deleted_count = 0
 
@@ -73,6 +74,8 @@ class CleanupThread(QThread):
                 summary += f"- {self.recycled_bin_size_gb:.2f} GB in Recycle Bin before cleaning"
             if self.removed_items:
                 summary += "\n\nRemoved items:\n" + "\n".join(self.removed_items)
+            if self.added_items:
+                summary += "\n\nAdded item:\n" + "\n".join(self.added_items)
 
             self.finished.emit(summary)
         except Exception as e:
@@ -80,17 +83,17 @@ class CleanupThread(QThread):
 
     def clean_combined_temp_folders(self):
         deleted_count = 0
-        user_temp_folder = os.getenv('TEMP')
+        user_temp_folder = os.getenv('TEMP')  # Get the current user's Temp folder dynamically
         deleted_count += self.delete_files_in_folder(user_temp_folder)
-        
+    
         system_temp_folder = r"C:\Windows\Temp"
         deleted_count += self.delete_files_in_folder(system_temp_folder)
-        
+    
         prefetch_folder = r"C:\Windows\Prefetch"
         deleted_count += self.delete_files_in_folder(prefetch_folder)
 
-        # Add the temp2 folder to be cleaned
-        temp2_folder = r"C:\Temp2"  # Update this path to the actual location of temp2 if needed
+        # Add the AppData\Local\Temp folder dynamically for any user
+        temp2_folder = os.path.join(os.getenv('USERPROFILE'), "AppData", "Local", "Temp")
         deleted_count += self.delete_files_in_folder(temp2_folder)
 
         return deleted_count
@@ -118,10 +121,12 @@ class CleanupThread(QThread):
     def clean_browser_cache(self):
         print("Cleaning browser cache...")
         self.removed_items.append("Browser Cache: Chrome, Firefox, etc.")
+        print("Browser cache cleaned successfully!")
 
     def remove_duplicate_files(self):
         print("Removing duplicate files...")
         self.removed_items.append("Duplicate Files: Example.txt, Example2.txt")
+        print("Remove duplicate files successfully!")
 
     def get_recycle_bin_size(self):
         total_size = 0
@@ -130,6 +135,7 @@ class CleanupThread(QThread):
             _fields_ = [("cbSize", ctypes.c_ulong),
                         ("i64Size", ctypes.c_int64),
                         ("i64NumItems", ctypes.c_int64)]
+
 
         def get_recycle_bin_info(drive):
             rb_info = SHQUERYRBINFO()
@@ -146,6 +152,7 @@ class CleanupThread(QThread):
     def check_and_remove_restore_points(self):
         print("Checking and removing old system restore points...")
         self.removed_items.append("Old System Restore Points: Removed")
+        print("Old system restore points removed successfully!")
 
     def defragment_hdd(self):
         print("Defragmenting HDD...")
@@ -153,32 +160,34 @@ class CleanupThread(QThread):
 
     def import_power_plan_func(self):
         try:
-            # Get the path of the current script and build the relative path to the power plan
-            script_dir = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the current script
-            power_plan_path = os.path.join(script_dir, "extra", "Power Plan", "TRADMSS.pow")  # Build the path dynamically
+            # Download the power plan file from GitHub and save it to the Desktop
+            desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+            power_plan_url = "https://github.com/boubli/System-Cleanup-Tool/raw/refs/heads/main/extra/Power%20Plan/TRADMSS.pow"
+            power_plan_path = os.path.join(desktop_path, "TRADMSS.pow")
+            urllib.request.urlretrieve(power_plan_url, power_plan_path)
             
-            print(f"Looking for power plan at: {power_plan_path}")  # Debugging line
-            if os.path.exists(power_plan_path):
-                # Use the powercfg command to import the power plan
-                os.system(f'powercfg /import "{power_plan_path}"')
-                self.removed_items.append(f"Power Plan: {power_plan_path} added successfully.")  # Changed to "added"
-            else:
-                self.removed_items.append(f"Power Plan File: {power_plan_path} not found.")
+            print(f"Power plan downloaded to: {power_plan_path}")
+            # Use the powercfg command to import the power plan
+            os.system(f'powercfg /import "{power_plan_path}"')
+            self.added_items.append(f"Power Plan: {power_plan_path} added successfully.")  # Changed to "added"
         except Exception as e:
-            self.removed_items.append(f"Power Plan Import Error: {e}")
+            self.added_items.append(f"Power Plan Import Error: {e}")
             print(f"Error importing power plan: {e}")
 
     def reduce_unnecessary_services(self):
-        # Execute the batch file to reduce unnecessary services
+        # Download the batch file for reducing unnecessary services from GitHub
         try:
-            batch_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extra", "bats", "reduce_services.bat")
-            if os.path.exists(batch_file_path):
-                subprocess.run(batch_file_path, check=True)
-                self.removed_items.append(f"Unnecessary services reduced using {batch_file_path}")
-            else:
-                self.removed_items.append("Batch file for reducing services not found.")
+            desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+            batch_file_url = "https://raw.githubusercontent.com/boubli/System-Cleanup-Tool/refs/heads/main/extra/bats/reduce_services.bat"
+            batch_file_path = os.path.join(desktop_path, "reduce_services.bat")
+            urllib.request.urlretrieve(batch_file_url, batch_file_path)
+            
+            print(f"Batch file downloaded to: {batch_file_path}")
+            # Execute the batch file to reduce unnecessary services
+            subprocess.run(batch_file_path, check=True, shell=True)
+            self.added_items.append(f"Unnecessary services reduced using {batch_file_path}")
         except Exception as e:
-            self.removed_items.append(f"Error reducing services: {e}")
+            self.added_items.append(f"Error reducing services: {e}")
             print(f"Error reducing services: {e}")
 
 
@@ -230,80 +239,62 @@ class CleanupApp(QWidget):
         self.check_for_updates()
 
     def start_cleanup(self):
-        if not (self.combined_cleanup_checkbox.isChecked() or
-                self.browser_cache_checkbox.isChecked() or
-                self.duplicate_files_checkbox.isChecked() or
-                self.restore_points_checkbox.isChecked() or
-                self.import_power_plan_checkbox.isChecked() or
-                self.reduce_services_checkbox.isChecked()):  # Add power plan check
-            QMessageBox.warning(self, "Error", "Please select at least one cleanup option before proceeding.")
+        if not (self.combined_cleanup_checkbox.isChecked() or self.browser_cache_checkbox.isChecked() or self.duplicate_files_checkbox.isChecked() or
+                self.restore_points_checkbox.isChecked() or self.defrag_hdd_checkbox.isChecked() or self.import_power_plan_checkbox.isChecked() or
+                self.reduce_services_checkbox.isChecked()):
+            QMessageBox.warning(self, "No Options Selected", "Please select at least one option to perform cleanup.")
             return
 
-        temp_folder = os.getenv('TEMP')
-        prefetch_folder = r"C:\Windows\Prefetch"
-        recycle_bin_path = "C:/$Recycle.Bin"
+        temp_folder = self.combined_cleanup_checkbox.isChecked()
+        prefetch_folder = self.combined_cleanup_checkbox.isChecked()
+        recycle_bin_path = self.combined_cleanup_checkbox.isChecked()
+        browser_cache = self.browser_cache_checkbox.isChecked()
+        duplicate_files = self.duplicate_files_checkbox.isChecked()
+        restore_points = self.restore_points_checkbox.isChecked()
+        defrag_hdd = self.defrag_hdd_checkbox.isChecked()
+        combined_cleanup = self.combined_cleanup_checkbox.isChecked()
+        import_power_plan = self.import_power_plan_checkbox.isChecked()
+        reduce_services = self.reduce_services_checkbox.isChecked()
 
-        self.cleanup_thread = CleanupThread(
-            temp_folder,
-            prefetch_folder,
-            recycle_bin_path,
-            self.browser_cache_checkbox.isChecked(),
-            self.duplicate_files_checkbox.isChecked(),
-            self.restore_points_checkbox.isChecked(),
-            self.defrag_hdd_checkbox.isChecked(),
-            self.combined_cleanup_checkbox.isChecked(),
-            self.import_power_plan_checkbox.isChecked(),
-            self.reduce_services_checkbox.isChecked()
-        )
-
-        self.cleanup_thread.progress.connect(self.update_progress)
-        self.cleanup_thread.finished.connect(self.show_message)
-
+        self.cleanup_thread = CleanupThread(temp_folder, prefetch_folder, recycle_bin_path, browser_cache, duplicate_files, restore_points,
+                                            defrag_hdd, combined_cleanup, import_power_plan, reduce_services)
+        self.cleanup_thread.progress.connect(self.progress_bar.setValue)
+        self.cleanup_thread.finished.connect(self.show_summary)
         self.cleanup_thread.start()
 
-    def update_progress(self, value):
-        self.progress_bar.setValue(value)
-
-    def show_message(self, message):
-        QMessageBox.information(self, "Cleanup Complete", message)
+    def show_summary(self, summary):
+        QMessageBox.information(self, "Cleanup Summary", summary)
 
     def show_about_info(self):
-        about_info = (
-            "Version: 2.0\n"
-            "Created by Youssef Boubli."
-        )
-        QMessageBox.information(self, "About", about_info)
+        about_message = """
+        System Cleanup Tool v1.0
+        Developed by Youssef Boubli
+        This tool helps you clean temporary files, browser cache, remove duplicate files, defragment your hard drive, and more.
+        """
+        QMessageBox.about(self, "About", about_message)
 
     def check_for_updates(self):
         try:
             response = requests.get("https://api.github.com/repos/boubli/System-Cleanup-Tool/releases/latest")
-            latest_release = response.json()
-            latest_version = latest_release['tag_name']
-            release_page_url = latest_release['html_url']  # GitHub release page URL
-            download_url = latest_release['assets'][0]['browser_download_url']  # URL for the first asset (assumed to be the installer)
-
-            current_version = "1.0"  # Replace with your current version number
+            latest_version = response.json()["tag_name"]
+            current_version = "v2.0"  # Replace with the actual current version
             if latest_version != current_version:
-                user_response = QMessageBox.question(self, "Update Available",
-                                                     f"A new version ({latest_version}) is available. Do you want to download it?",
-                                                     QMessageBox.Yes | QMessageBox.No)
-                if user_response == QMessageBox.Yes:
-                    self.download_and_install_update(download_url)
+                update_message = f"New version {latest_version} is available. Do you want to update?"
+                reply = QMessageBox.question(self, "Update Available", update_message,
+                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply == QMessageBox.Yes:
+                    self.download_and_install_update(latest_version)
         except Exception as e:
             print(f"Error checking for updates: {e}")
 
-    def download_and_install_update(self, download_url):
+    def download_and_install_update(self, version):
+        update_url = f"https://github.com/boubli/System-Cleanup-Tool/releases/download/{version}/System-Cleanup-Tool-{version}.exe"
         try:
-            # Download the update
-            temp_file_path = os.path.join(os.getenv("TEMP"), "update_installer.exe")
-            urllib.request.urlretrieve(download_url, temp_file_path)
-
-            # Run the installer
-            subprocess.run(temp_file_path, check=True)
-            QMessageBox.information(self, "Update", "The update has been downloaded and installed successfully.")
+            update_file_path = os.path.join(os.path.expanduser("~"), "Downloads", f"System-Cleanup-Tool-{version}.exe")
+            urllib.request.urlretrieve(update_url, update_file_path)
+            QMessageBox.information(self, "Update Downloaded", f"The update has been downloaded to {update_file_path}. Please install it manually.")
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"An error occurred while downloading or installing the update: {e}")
-
+            print(f"Error downloading update: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
